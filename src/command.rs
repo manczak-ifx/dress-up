@@ -62,6 +62,7 @@ pub(crate) struct Command<'a> {
     pub(crate) label: SuitCommand,
     pub(crate) argument: CommandArgument<'a>,
     pub(crate) position: usize,
+    pub(crate) encoded: &'a ByteSlice,
 }
 
 impl<'a> Command<'a> {
@@ -127,10 +128,17 @@ impl<'a> CommandSequenceIterator<'a> {
         let position = self.d.position();
         let label = self.d.i32()?.into();
         let argument = CommandArgument::new(label, &mut self.d)?;
+        let encoded = self
+            .d
+            .input()
+            .get(position..self.d.position())
+            .ok_or(Error::InvalidCommandSequence { position })?
+            .into();
         Ok(Command {
             label,
             argument,
             position,
+            encoded,
         })
     }
 }
@@ -380,9 +388,21 @@ impl<'a, O: OperatingHooks> CommandSequenceExecutor<'a, O> {
             let mut command = command?;
             let position = command.position;
             if match_component {
+                self.os_hooks.on_command(
+                    command.label,
+                    position,
+                    component_info.component(),
+                    command.encoded,
+                );
                 self.process_command(&mut state, component_info, &mut match_component, command)
                     .map_err(|e| e.add_offset(position))?;
             } else if matches!(command.label, SuitCommand::SetComponentIndex) {
+                self.os_hooks.on_command(
+                    command.label,
+                    position,
+                    component_info.component(),
+                    command.encoded,
+                );
                 if let CommandArgument::Cbor {
                     ref mut decoder,
                     offset,
