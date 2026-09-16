@@ -63,6 +63,11 @@ pub fn check(
 
     let mut wrapped = bstr_header(manifest_bytes.len());
     wrapped.extend_from_slice(manifest_bytes);
+    log_data!("digest input header:        {:#?}", wrapped[..wrapped.len().min(16)].to_vec());
+    log_data!("digest input length:        {} bytes", wrapped.len());
+    log_data!("digest input bytes (first 64): {:02x?}", &wrapped[..wrapped.len().min(64)]);
+    log_data!("digest input bytes (full hex): {:02x?}", wrapped);
+    log_data!("manifest bytes (first 64):      {:02x?}", &manifest_bytes[..manifest_bytes.len().min(64)]);
     match hash(algo_id, &wrapped) {
         Some((name, computed)) => {
             log_data!("digest computed locally ({name}): {computed:02x?}");

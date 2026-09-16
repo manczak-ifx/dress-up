@@ -6,6 +6,7 @@
 use std::cell::RefCell;
 
 use dress_up::component::Component;
+use dress_up::consts::SuitCommand;
 use dress_up::error::Error;
 use dress_up::manifeststate::ManifestState;
 use dress_up::OperatingHooks;
@@ -40,6 +41,39 @@ impl LoggingHooks {
 
 impl OperatingHooks for LoggingHooks {
     type ReadWriteBufferSize = generic_array::typenum::U64;
+
+    fn on_command(
+        &self,
+        command: SuitCommand,
+        position: usize,
+        component: &Component,
+        encoded_command: &[u8],
+    ) {
+        let category = match command {
+            SuitCommand::VendorIdentifier
+            | SuitCommand::ClassIdentifier
+            | SuitCommand::ImageMatch
+            | SuitCommand::ComponentSlot
+            | SuitCommand::CheckContent
+            | SuitCommand::DeviceIdentifier => "condition",
+            SuitCommand::WriteContent
+            | SuitCommand::Fetch
+            | SuitCommand::Copy
+            | SuitCommand::Invoke
+            | SuitCommand::Swap
+            | SuitCommand::Custom(_) => "directive/command",
+            SuitCommand::SetComponentIndex
+            | SuitCommand::Abort
+            | SuitCommand::TryEach
+            | SuitCommand::RunSequence
+            | SuitCommand::OverrideParameters
+            | SuitCommand::Unset => "control/parameter",
+            _ => "unknown",
+        };
+        log_hook!(
+            "execute {category}: command={command:?}, position={position}, encoded={encoded_command:02x?}, component={component:?}"
+        );
+    }
 
     fn match_vendor_id(&self, uuid: Uuid, component: &Component) -> Result<bool, Error> {
         log_hook!("match_vendor_id(uuid={uuid}, component={component:?}) -> accepted (testing mode)");
