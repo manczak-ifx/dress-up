@@ -10,6 +10,7 @@ use dress_up::consts::SuitCommand;
 use dress_up::error::Error;
 use dress_up::manifeststate::ManifestState;
 use dress_up::OperatingHooks;
+use dress_up::report::ReportingPolicy;
 use uuid::Uuid;
 
 use crate::log::{log_hook, log_warn};
@@ -42,12 +43,13 @@ impl LoggingHooks {
 impl OperatingHooks for LoggingHooks {
     type ReadWriteBufferSize = generic_array::typenum::U64;
 
-    fn on_command(
+    fn on_command_with_reporting_policy(
         &self,
         command: SuitCommand,
         position: usize,
         component: &Component,
         encoded_command: &[u8],
+        reporting_policy: Option<ReportingPolicy>,
     ) {
         let category = match command {
             SuitCommand::VendorIdentifier
@@ -71,8 +73,17 @@ impl OperatingHooks for LoggingHooks {
             _ => "unknown",
         };
         log_hook!(
-            "execute {category}: command={command:?}, position={position}, encoded={encoded_command:02x?}, component={component:?}"
+            "execute {category}: command={command:?}, position={position}, encoded={encoded_command:02x?}, reporting_policy={reporting_policy:?}, component={component:?}"
         );
+        if let Some(policy) = reporting_policy {
+            log_hook!(
+                "reporting flags: send_record_on_success={}, send_record_on_failure={}, add_sysinfo_on_success={}, add_sysinfo_on_failure={}",
+                policy.send_record_on_success(),
+                policy.send_record_on_failure(),
+                policy.add_sysinfo_on_success(),
+                policy.add_sysinfo_on_failure()
+            );
+        }
     }
 
     fn match_vendor_id(&self, uuid: Uuid, component: &Component) -> Result<bool, Error> {

@@ -31,3 +31,27 @@ pub fn log_manifest(manifest: &Manifest<'_, Authenticated>) -> Result<(), Error>
     log_data!("invoke section present: {}", manifest.has_invoke()?);
     Ok(())
 }
+
+/// Logs every command and its parsed reporting policy without executing the manifest.
+pub fn log_commands(manifest: &Manifest<'_, Authenticated>) -> Result<(), Error> {
+    manifest.inspect_commands(|entry| {
+        log_data!(
+            "command: section={:?}, component={}, command={:?}, position={}, encoded={:02x?}, reporting_policy={:?}",
+            entry.section,
+            entry.component_index,
+            entry.command,
+            entry.position,
+            entry.encoded,
+            entry.reporting_policy,
+        );
+        if let Some(policy) = entry.reporting_policy {
+            log_data!(
+                "reporting flags: send_record_on_success={}, send_record_on_failure={}, add_sysinfo_on_success={}, add_sysinfo_on_failure={}",
+                policy.send_record_on_success(),
+                policy.send_record_on_failure(),
+                policy.add_sysinfo_on_success(),
+                policy.add_sysinfo_on_failure()
+            );
+        }
+    })
+}

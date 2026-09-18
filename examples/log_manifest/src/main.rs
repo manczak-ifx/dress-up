@@ -1,11 +1,9 @@
-//! Test entry point that parses a SUIT manifest and logs every operation performed.
+//! Test entry point that parses a SUIT manifest and logs every command without executing it.
 //!
-//! This binary is a thin orchestrator only: all logging behaviour lives in [`hooks`], all
-//! manifest inspection lives in [`inspect`], digest/signature reporting lives in
-//! [`digest_check`]/[`signature_check`], and the actual parsing/execution is delegated entirely
-//! to the `dress-up` library. Nothing here re-implements library logic.
+//! This binary is a thin orchestrator only: manifest inspection lives in [`inspect`],
+//! digest/signature reporting lives in [`digest_check`]/[`signature_check`], and parsing is
+//! delegated entirely to the `dress-up` library.
 mod digest_check;
-mod hooks;
 mod inspect;
 mod log;
 mod signature_check;
@@ -15,23 +13,16 @@ use std::path::PathBuf;
 use clap::Parser;
 use dress_up::SuitManifest;
 
-use crate::hooks::LoggingHooks;
-use crate::log::{log_step, log_warn};
+use crate::log::log_step;
 
 /// Parses a SUIT manifest and logs every operation, data read and command found.
 #[derive(Parser, Debug)]
 struct Args {
     /// Path to the SUIT envelope (CBOR) to process.
     manifest: PathBuf,
-    /// Optional payload file, returned to the manifest whenever it fetches content.
-    #[arg(long)]
-    payload: Option<PathBuf>,
     /// Optional PEM-encoded EC public key used to verify a signature, if one is present.
     #[arg(long)]
     pubkey: Option<PathBuf>,
-    /// Simulated capacity (in bytes) of the component storage backing this test run.
-    #[arg(long, default_value_t = 4096)]
-    capacity: usize,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
@@ -39,17 +30,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
     log_step!("reading manifest file {:?}", args.manifest);
     let manifest_bytes = std::fs::read(&args.manifest)?;
-
-    let payload = match &args.payload {
-        Some(path) => {
-            log_step!("reading payload file {path:?}");
-            std::fs::read(path)?
-        }
-        None => {
-            log_warn!("no --payload supplied, fetch operations will report zero bytes");
-            Vec::new()
-        }
-    };
 
     log_step!("parsing SUIT envelope");
     let suit = SuitManifest::from_bytes(&manifest_bytes);
@@ -72,12 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let manifest = envelope.manifest()?;
     inspect::log_manifest(&manifest)?;
 
-    log_step!("executing all command sequences");
-    let hooks = LoggingHooks::new(args.capacity, payload);
-    manifest.execute_full(&hooks)?;
-
-    let storage = hooks.storage_snapshot();
-    log_step!("final simulated component contents: {} bytes", storage.len());
+    log_step!("inspecting command sequences without execution");
+    inspect::log_commands(&manifest)?;
 
     Ok(())
 }
