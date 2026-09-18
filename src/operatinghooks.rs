@@ -20,19 +20,6 @@ pub trait OperatingHooks {
     /// and the Content check use this buffer.
     type ReadWriteBufferSize: ArrayLength;
 
-    /// Observe a command immediately before it is executed.
-    ///
-    /// The default implementation does nothing. Applications can override this hook for
-    /// tracing or diagnostics; it must not change the command's execution semantics.
-    fn on_command(
-        &self,
-        _command: SuitCommand,
-        _position: usize,
-        _component: &Component,
-        _encoded_command: &[u8],
-    ) {
-    }
-
     /// Match the vendor ID from the manifest.
     ///
     /// Installations without multiple components can ignore the `component` parameter.

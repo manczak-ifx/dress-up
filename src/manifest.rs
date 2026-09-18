@@ -7,7 +7,7 @@ use minicbor::data::Token;
 use minicbor::decode::Decoder;
 
 use crate::cbor::SubCbor;
-use crate::command::CommandSequence;
+use crate::command::{CommandInspection, CommandSequence};
 use crate::component::{ComponentInfo, ComponentIter};
 use crate::error::Error;
 use crate::manifeststate::ManifestState;
@@ -76,6 +76,36 @@ impl<'a, S: AuthState> Manifest<'a, S> {
 }
 
 impl<'a> Manifest<'a, Authenticated> {
+    /// Visit every decoded command without executing conditions or directives.
+    pub fn inspect_commands<F>(&self, mut visitor: F) -> Result<(), Error>
+    where
+        F: FnMut(CommandInspection<'a>),
+    {
+        let common = self.get_common()?;
+        let mut component_decoder = Decoder::new(common.components);
+        for (idx, component) in ComponentIter::new(&mut component_decoder)
+            .map_err(|e| e.add_offset(common.component_offset))?
+            .enumerate()
+        {
+            let _component = component.map_err(|e| e.add_offset(common.component_offset))?;
+            let idx = idx.try_into().map_err(|_| Error::UnexpectedCbor {
+                position: self.decoder.position(),
+            })?;
+
+            common.shared_sequence().inspect(
+                crate::consts::Manifest::CommonData,
+                idx,
+                &mut visitor,
+            )?;
+            for section in crate::consts::SUIT_COMMAND_SECTIONS {
+                if let Some(sequence) = self.find_command_sequence(section)? {
+                    sequence.inspect(section, idx, &mut visitor)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn find_section(
         &self,
         section: crate::consts::Manifest,
@@ -318,7 +348,7 @@ impl<'a> Manifest<'a, Authenticated> {
     ///
     /// The command sequence in the common section is executed before the command sequence in the
     /// image validation is executed.
-    pub fn async_execute_image_validation<T: AsyncOperatingHooks>(
+    pub fn async_execute_image_validation(
         &'a self,
         os_hooks: &'a impl AsyncOperatingHooks,
     ) -> impl Future<Output = Result<(), Error>> + 'a {
@@ -329,7 +359,7 @@ impl<'a> Manifest<'a, Authenticated> {
     ///
     /// The command sequence in the common section is executed before the command sequence in the
     /// image loading is executed.
-    pub fn async_execute_image_loading<T: AsyncOperatingHooks>(
+    pub fn async_execute_image_loading(
         &'a self,
         os_hooks: &'a impl AsyncOperatingHooks,
     ) -> impl Future<Output = Result<(), Error>> + 'a {

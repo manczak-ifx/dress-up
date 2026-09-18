@@ -17,6 +17,23 @@ use crate::report::ReportingPolicy;
 use crate::AsyncOperatingHooks;
 use crate::OperatingHooks;
 
+/// A command decoded from a manifest without executing it.
+#[derive(Copy, Clone, Debug)]
+pub struct CommandInspection<'a> {
+    /// Manifest section containing the command.
+    pub section: crate::consts::Manifest,
+    /// Component index used while inspecting the command sequence.
+    pub component_index: u32,
+    /// Decoded command label.
+    pub command: SuitCommand,
+    /// Byte position within the command sequence.
+    pub position: usize,
+    /// Raw CBOR encoding of the command and its argument.
+    pub encoded: &'a [u8],
+    /// Parsed reporting policy, when this command has one.
+    pub reporting_policy: Option<ReportingPolicy>,
+}
+
 bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq, Default)]
     pub(crate) struct CommandSequenceProperties: u32 {
@@ -209,8 +226,31 @@ impl<'a> CommandSequence<'a> {
             .map_err(|e| e.add_offset(self.offset))
     }
 
-    pub(crate) fn command_iter(&self) -> Result<CommandSequenceIterator<'_>, Error> {
+    pub(crate) fn command_iter(&self) -> Result<CommandSequenceIterator<'a>, Error> {
         CommandSequenceIterator::new(self.sequence, self.offset)
+    }
+
+    pub(crate) fn inspect<F>(
+        &self,
+        section: crate::consts::Manifest,
+        component_index: u32,
+        visitor: &mut F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(CommandInspection<'a>),
+    {
+        for command in self.command_iter()? {
+            let command = command?;
+            visitor(CommandInspection {
+                section,
+                component_index,
+                command: command.label,
+                position: command.position,
+                encoded: command.encoded,
+                reporting_policy: command.get_report_policy().ok(),
+            });
+        }
+        Ok(())
     }
 
     fn add_properties(
@@ -427,21 +467,9 @@ impl<'a, O: OperatingHooks> CommandSequenceExecutor<'a, O> {
             let mut command = command?;
             let position = command.position;
             if match_component {
-                self.os_hooks.on_command(
-                    command.label,
-                    position,
-                    component_info.component(),
-                    command.encoded,
-                );
                 self.process_command(&mut state, component_info, &mut match_component, command)
                     .map_err(|e| e.add_offset(position))?;
             } else if matches!(command.label, SuitCommand::SetComponentIndex) {
-                self.os_hooks.on_command(
-                    command.label,
-                    position,
-                    component_info.component(),
-                    command.encoded,
-                );
                 if let CommandArgument::Cbor {
                     ref mut decoder,
                     offset,
