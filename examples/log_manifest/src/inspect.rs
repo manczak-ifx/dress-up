@@ -2,6 +2,7 @@
 use dress_up::error::Error;
 use dress_up::manifest::Manifest;
 use dress_up::{Authenticated, Envelope};
+use minicbor::Decoder;
 
 use crate::log::log_data;
 
@@ -18,6 +19,13 @@ pub fn log_envelope<S: dress_up::AuthState>(envelope: &Envelope<'_, S>) -> Resul
 pub fn log_manifest(manifest: &Manifest<'_, Authenticated>) -> Result<(), Error> {
     log_data!("manifest encoding version: {}", manifest.version()?);
     log_data!("manifest sequence number: {}", manifest.sequence_number()?);
+    if let Some(set_version) = manifest.set_version()? {
+        let mut decoder = Decoder::new(set_version);
+        let versions = decoder.array_iter::<i64>()?.collect::<Result<Vec<_>, _>>()?;
+        log_data!("manifest set version: {versions:?}");
+    } else {
+        log_data!("manifest set version: absent");
+    }
     log_data!("payload fetch section present: {}", manifest.has_payload_fetch()?);
     log_data!(
         "payload installation section present: {}",
@@ -32,26 +40,16 @@ pub fn log_manifest(manifest: &Manifest<'_, Authenticated>) -> Result<(), Error>
     Ok(())
 }
 
-/// Logs every command and its parsed reporting policy without executing the manifest.
+/// Logs every command without executing the manifest.
 pub fn log_commands(manifest: &Manifest<'_, Authenticated>) -> Result<(), Error> {
     manifest.inspect_commands(|entry| {
         log_data!(
-            "command: section={:?}, component={}, command={:?}, position={}, encoded={:02x?}, reporting_policy={:?}",
+            "command: section={:?}, component={}, command={:?}, position={}, encoded={:02x?}",
             entry.section,
             entry.component_index,
             entry.command,
             entry.position,
             entry.encoded,
-            entry.reporting_policy,
         );
-        if let Some(policy) = entry.reporting_policy {
-            log_data!(
-                "reporting flags: send_record_on_success={}, send_record_on_failure={}, add_sysinfo_on_success={}, add_sysinfo_on_failure={}",
-                policy.send_record_on_success(),
-                policy.send_record_on_failure(),
-                policy.add_sysinfo_on_success(),
-                policy.add_sysinfo_on_failure()
-            );
-        }
     })
 }

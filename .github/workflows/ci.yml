@@ -32,3 +32,6 @@ jobs:
 
       - name: Run tests
         run: cargo test --all-targets --all-features
+
+      - name: Run integration tests
+        run: cargo test --manifest-path tests/integration/Cargo.toml --all-features

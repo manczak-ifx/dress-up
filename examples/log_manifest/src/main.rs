@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use dress_up::SuitManifest;
 
-use crate::log::log_step;
+use crate::log::{log_step, log_warn};
 
 /// Parses a SUIT manifest and logs every operation, data read and command found.
 #[derive(Parser, Debug)]
@@ -40,9 +40,32 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let num_signatures =
         digest_check::check(envelope.auth_object()?, envelope.manifest_bytes()?)?;
     signature_check::report_presence(num_signatures);
+
+    log_step!("checking signature with cose-nostd");
+    let cose_nostd_suit = SuitManifest::from_bytes(&manifest_bytes);
+    let cose_nostd_result = cose_nostd_suit.authenticate(|cose, payload| {
+        signature_check::verify_with_cose_nostd(cose, payload)
+    });
+    match cose_nostd_result {
+        Ok(_) => log_step!("cose-nostd signature check: match"),
+        Err(error) => log_warn!("cose-nostd signature check: MISMATCH ({error})"),
+    }
+
     let key = signature_check::load_key(args.pubkey.as_deref())?;
 
-    let suit = suit.authenticate(|cose, payload| signature_check::verify(&key, cose, payload))?;
+    log_step!("checking signature with cose-rust");
+    let suit = SuitManifest::from_bytes(&manifest_bytes);
+    let suit = match suit.authenticate(|cose, payload| signature_check::verify(&key, cose, payload))
+    {
+        Ok(suit) => {
+            log_step!("cose-rust signature check: match");
+            suit
+        }
+        Err(error) => {
+            log_warn!("cose-rust signature check: MISMATCH ({error})");
+            return Err(error.into());
+        }
+    };
 
     log_step!("deriving envelope from authenticated manifest");
     let envelope = suit.envelope()?;

@@ -1,7 +1,7 @@
 # SUIT manifest logger
 
 Testing/debugging helper that parses a SUIT envelope and logs every step,
-manifest command, and parsed reporting policy. It does not execute conditions,
+manifest command. It does not execute conditions,
 directives, or operating-system hooks.
 
 The manifest digest and signature are checked separately, mirroring how the

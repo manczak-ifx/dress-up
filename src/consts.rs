@@ -57,6 +57,8 @@ pub enum Manifest {
     /// Monotonically increasing anti-rollback counter.
     /// *May* be implemented as a timestamp.
     SequenceNumber = 2,
+    /// Version comparison value required for the update.
+    SetVersion = 6,
     /// Encodes all information shared between command sequences.
     CommonData = 3,
     /// URI where the full manifest can be found.

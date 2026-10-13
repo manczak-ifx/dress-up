@@ -1,0 +1,11 @@
+[package]
+name = "dress-up-integration-tests"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dev-dependencies]
+dress-up = { path = "../.." }
+hex = "0.4.3"
+taylor = git
+embroider =

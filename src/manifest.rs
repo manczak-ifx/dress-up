@@ -73,6 +73,24 @@ impl<'a, S: AuthState> Manifest<'a, S> {
         }
         Err(Error::NoSequenceNumber)
     }
+
+    /// Retrieve the optional `suit-set-version` value from the manifest.
+    ///
+    /// The returned byte string contains the CBOR-encoded version comparison value.
+    pub fn set_version(&self) -> Result<Option<&'a ByteSlice>, Error> {
+        let mut decoder = self.decoder.clone();
+        let len = decoder.map()?.ok_or(Error::UnexpectedIndefiniteLength {
+            position: decoder.position(),
+        })?;
+        for _ in 0..len {
+            let key = decoder.i16()?;
+            if key == crate::consts::Manifest::SetVersion.into() {
+                return Ok(Some(decoder.bytes()?.into()));
+            }
+            decoder.skip()?;
+        }
+        Ok(None)
+    }
 }
 
 impl<'a> Manifest<'a, Authenticated> {
