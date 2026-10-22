@@ -199,6 +199,8 @@ pub enum SuitCommand {
     ComponentSlot = 5,
     /// Check the content in the component based on the [`SuitParameter::Content`].
     CheckContent = 6,
+    /// Compare the device version with the manifest's `suit-set-version` value.
+    ConditionVersion = 28,
     /// Set the component index for the next commands in the sequence.
     SetComponentIndex = 12,
     /// Abort the manifest processing.
@@ -243,6 +245,7 @@ impl From<i32> for SuitCommand {
             3 => SuitCommand::ImageMatch,
             5 => SuitCommand::ComponentSlot,
             6 => SuitCommand::CheckContent,
+            28 => SuitCommand::ConditionVersion,
             12 => SuitCommand::SetComponentIndex,
             14 => SuitCommand::Abort,
             15 => SuitCommand::TryEach,
@@ -268,6 +271,7 @@ impl From<SuitCommand> for i32 {
             SuitCommand::ImageMatch => 3,
             SuitCommand::ComponentSlot => 5,
             SuitCommand::CheckContent => 6,
+            SuitCommand::ConditionVersion => 28,
             SuitCommand::SetComponentIndex => 12,
             SuitCommand::Abort => 14,
             SuitCommand::TryEach => 15,
@@ -294,6 +298,7 @@ impl SuitCommand {
             SuitCommand::ImageMatch => true,
             SuitCommand::ComponentSlot => true,
             SuitCommand::CheckContent => true,
+            SuitCommand::ConditionVersion => true,
             SuitCommand::SetComponentIndex => false,
             SuitCommand::Abort => true,
             SuitCommand::TryEach => false,

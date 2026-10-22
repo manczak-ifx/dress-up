@@ -240,7 +240,7 @@ impl<'a> CommandSequence<'a> {
         F: FnMut(CommandInspection<'a>),
     {
         for command in self.command_iter()? {
-            let command = command?;
+            let mut command = command?;
             visitor(CommandInspection {
                 section,
                 component_index,
@@ -249,6 +249,19 @@ impl<'a> CommandSequence<'a> {
                 encoded: command.encoded,
                 reporting_policy: command.get_report_policy().ok(),
             });
+            if command.label == SuitCommand::TryEach {
+                let mut argument = command.get_argument_cbor()?.clone();
+                for sequence in argument.array_iter::<&ByteSlice>()? {
+                    let sequence = sequence?;
+                    if !sequence.is_empty() {
+                        CommandSequence::new(sequence, 0).inspect(
+                            section,
+                            component_index,
+                            visitor,
+                        )?;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -410,6 +423,9 @@ impl<'a, O: OperatingHooks> CommandSequenceExecutor<'a, O> {
                 // byte by byte check
                 self.cond_check_content(state, component)?;
             }
+            SuitCommand::ConditionVersion => Err(Error::UnsupportedCommand {
+                command: command.label.into(),
+            })?,
             SuitCommand::ClassIdentifier => self.cond_class_identifier(state, component)?,
             SuitCommand::ComponentSlot => {
                 self.cond_component_slot(state, component)?;
@@ -814,6 +830,9 @@ impl<'a, O: AsyncOperatingHooks> CommandSequenceExecutor<'a, O> {
                 // byte by byte check
                 self.async_cond_check_content(state, component).await?;
             }
+            SuitCommand::ConditionVersion => Err(Error::UnsupportedCommand {
+                command: command.label.into(),
+            })?,
             SuitCommand::ClassIdentifier => {
                 self.async_cond_class_identifier(state, component).await?;
             }

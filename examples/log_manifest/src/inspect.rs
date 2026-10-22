@@ -22,9 +22,9 @@ pub fn log_manifest(manifest: &Manifest<'_, Authenticated>) -> Result<(), Error>
     if let Some(set_version) = manifest.set_version()? {
         let mut decoder = Decoder::new(set_version);
         let versions = decoder.array_iter::<i64>()?.collect::<Result<Vec<_>, _>>()?;
-        log_data!("manifest set version: {versions:?}");
+        log_data!("suit-set-version: {versions:?}");
     } else {
-        log_data!("manifest set version: absent");
+        log_data!("suit-set-version: absent");
     }
     log_data!("payload fetch section present: {}", manifest.has_payload_fetch()?);
     log_data!(
@@ -51,5 +51,8 @@ pub fn log_commands(manifest: &Manifest<'_, Authenticated>) -> Result<(), Error>
             entry.position,
             entry.encoded,
         );
+        if entry.command == dress_up::consts::SuitCommand::ConditionVersion {
+            log_data!("suit-condition-version: encoded={:02x?}", entry.encoded);
+        }
     })
 }

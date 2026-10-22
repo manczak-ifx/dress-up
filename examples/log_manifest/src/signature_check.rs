@@ -2,6 +2,7 @@
 use std::fmt;
 use std::path::Path;
 
+use cose::algs;
 use cose::keys::CoseKey;
 use cose::message::CoseMessage;
 use cose_nostd::iana::{key_labels, Algorithm, EllipticCurve, KeyOperation, KeyType};
@@ -58,6 +59,19 @@ pub fn load_key(
     let pem = std::fs::read(path)?;
     let pub_key = openssl::ec::EcKey::public_key_from_pem(&pem)?;
     let group = pub_key.group();
+    let (curve, algorithm) = match group.curve_name() {
+        Some(openssl::nid::Nid::X9_62_PRIME256V1) => (cose::keys::P_256, algs::ES256),
+        Some(openssl::nid::Nid::SECP384R1) => (cose::keys::P_384, algs::ES384),
+        Some(openssl::nid::Nid::SECP521R1) => (cose::keys::P_521, algs::ES512),
+        Some(openssl::nid::Nid::SECP256K1) => (cose::keys::SECP256K1, algs::ES256K),
+        _ => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "unsupported EC public key curve",
+            )
+            .into());
+        }
+    };
     let mut x = openssl::bn::BigNum::new()?;
     let mut y = openssl::bn::BigNum::new()?;
     let mut ctx = openssl::bn::BigNumContext::new()?;
@@ -69,8 +83,8 @@ pub fn load_key(
 
     let mut key = CoseKey::new();
     key.kty(cose::keys::EC2);
-    key.alg(cose::algs::ES256);
-    key.crv(cose::keys::P_256);
+    key.alg(algorithm);
+    key.crv(curve);
     key.x(x.to_vec());
     key.y(y.to_vec());
     key.key_ops(vec![cose::keys::KEY_OPS_VERIFY]);
